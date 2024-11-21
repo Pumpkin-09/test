@@ -161,11 +161,12 @@ def ecriture_donnees_livres(nom, dossier_livres, dossier_images, donnees) :
     # Enregistrement des données dans un fichier CSV nommé en fonction de la catégorie.
     en_tete = ["product_page_url", "universal_product_code (upc)", "title", "price_including_tax", "price_excluding_tax", "number_available", "product_description", "category", "review_rating","image_url","nom_image", "chemin_image"]
 
-    for liste_donnees_livres in donnees:
-        name = os.path.join(dossier_livres, nom +".csv")
-        with open(name, "w", encoding = "utf-8") as f :
-            writer = csv.writer(f, delimiter = ",")
-            writer.writerow(en_tete)
+
+    name = os.path.join(dossier_livres, nom +".csv")
+    with open(name, "w", encoding = "utf-8") as f :
+        writer = csv.writer(f, delimiter = ",")
+        writer.writerow(en_tete)
+        for liste_donnees_livres in donnees:
             writer.writerow(liste_donnees_livres)
 
     #Téléchargement de l'image dans le dossier "images"
