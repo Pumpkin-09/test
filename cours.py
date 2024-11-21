@@ -1,59 +1,84 @@
-from dataclasses import dataclass, field
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+import csv
 import os
 
 url_book_to_scrap = "http://books.toscrape.com"
 
 
-@dataclass
-class ListeCategories:
 
-    liste_categories: list[str] = field(default_factory=list)
+
+
+
     
 
-@dataclass 
+
 class Livre:
-    url: str 
-    upc: str
-    titre_livre: str 
-    price_including_taxe: str 
-    price_excluding_taxe: str
-    number_available: str
-    description_livre: str
-    categorie_livre: str
-    book_rating: str
-    image_couverture: str
+
+    def __init__(self, url, upc, titre, price_including_taxe, price_excluding_taxe, number_available, description, categorie, book_rating, image_couverture):
+
+        self.url = url
+        self.upc = upc
+        self.titre = titre
+        self.price_including_taxe = price_including_taxe 
+        self.price_excluding_taxe = price_excluding_taxe
+        self.number_available = number_available
+        self.description = description
+        self.categorie = categorie
+        self.book_rating = book_rating
+        self.image_couverture = image_couverture
+    
+    def to_list(self):
+        return [self.url, self.upc, self.titre, self.price_including_taxe, self.price_excluding_taxe, self.number_available, self.description, self.categorie, self.book_rating, self.image_couverture]
 
 
-class LienLivresCategorie:
+class Categorie:
+    def __init__(self, nom):
+        self.nom = nom
 
-    def liste_livres(self, url):
+    def liste_de_livres(self, url_de_categorie):
 
-        liste_pages = []
-        liste_pages.append(url)
-        page = requests.get(url)
+        livres = []
+        page = requests.get(url_de_categorie)
         soupe = BeautifulSoup(page.content, "html.parser")
-        pages = soupe.find("li", class_="next")
-        while pages != None:
-            nbr_page = pages.find.a.get("href")
-            url_modifier = url.replace("index.html",nbr_page)
-            liste_pages.append(url_modifier)
+        page_suivante = soupe.find("li", class_="next")
+        while page_suivante != None:
+            element_a = page_suivante.find("a")
+            nbr_page = element_a.get("href")
+            url_modifier = url_de_categorie.replace("index.html",nbr_page)
+
+            page = requests.get(url_modifier)
+            soupe = BeautifulSoup(page.content, "html.parser")
+            liens_livre = soupe.find_all("article")
+            for lien_livre in liens_livre:
+                lien_livre_modifier = lien_livre.h3.a.get("href").replace("../../..", "http://books.toscrape.com/catalogue")
+                livre = Scrapeur("truc").donnees_livre(lien_livre_modifier)
+                livres.append(livre)
+
             page_modifier = requests.get(url_modifier)
             soupe = BeautifulSoup(page_modifier.content, "html.parser")
-            pages = soupe.finf("li", class_="next")
-        return liste_pages
+            page_suivante = soupe.find("li", class_="next")
+
+        page = requests.get(url_de_categorie)
+        soupe = BeautifulSoup(page.content, "html.parser")
+        liens_livre = soupe.find_all("article")
+        for lien_livre in liens_livre:
+            lien_livre_modifier = lien_livre.h3.a.get("href").replace("../../..", "http://books.toscrape.com/catalogue")
+            livre = Scrapeur("livre").donnees_livre(lien_livre_modifier)
+            livres.append(livre)
+
+        return livres
 
 
-@dataclass
-class Scraping:
-    url: str
-    donnees_livre: list[str] = field(default_factory=list)
 
-    def __post_init__(self):
+class Scrapeur:
+    def __init__(self, nom):
+        self.nom = nom
+
+    def donnees_livre(self, url):
         
-        page = requests.get(self.url)
+        page = requests.get(url)
         soup = BeautifulSoup(page.content, "html.parser")
 
         # Récupération de la description du livre
@@ -87,8 +112,8 @@ class Scraping:
         image = soup.find("img")
         image_couverture = urljoin("http://books.toscrape.com/", image.get("src"))
 
-        donnees_livre = Livre(
-            self.url, 
+        donnees_du_livre = Livre(
+            url, 
             upc, 
             titre_livre, 
             price_including_taxe, 
@@ -99,6 +124,8 @@ class Scraping:
             book_rating,
             image_couverture
             )
+        liste_donnees_livre = donnees_du_livre.to_list()
+        return liste_donnees_livre
 
             
     def verification_donnees(self, donnees):
@@ -111,7 +138,6 @@ class Scraping:
 
 class TransformationDonnees:
     
-
     def remplacement_note(self, note):
         remplacement = {
         "One" : "1 sur 5",
@@ -131,49 +157,72 @@ class TransformationDonnees:
 
 
 
+def ecriture_donnees_livres(nom, dossier_livres, dossier_images, donnees) :
+    # Enregistrement des données dans un fichier CSV nommé en fonction de la catégorie.
+    en_tete = ["product_page_url", "universal_product_code (upc)", "title", "price_including_tax", "price_excluding_tax", "number_available", "product_description", "category", "review_rating","image_url","nom_image", "chemin_image"]
 
+    for liste_donnees_livres in donnees:
+        name = os.path.join(dossier_livres, nom +".csv")
+        with open(name, "w", encoding = "utf-8") as f :
+            writer = csv.writer(f, delimiter = ",")
+            writer.writerow(en_tete)
+            writer.writerow(liste_donnees_livres)
 
-
-livres = []
-noms_categorie = []
-liens_categorie = []
-'''
-# Créer le dossier "dossier livres" s'il n'existe pas déjà
-dossier_livres = "dossier livres"
-if not os.path.exists(dossier_livres):
-    os.mkdir(dossier_livres)
-
-# Créer le dossier "images" à l'intérieur du dossier "dossier livres" s'il n'existe pas déjà
-dossier_images = os.path.join(dossier_livres, "images")
-if not os.path.exists(dossier_images):
-    os.mkdir(dossier_images)
-
-
-page = requests.get(url_book_to_scrap)
-soup = BeautifulSoup(page.content, "html.parser")
-pages = soup.find("dinv", class_="side_categories")
-infos_categories = pages.find("ul").find("li").find("ul")
-
-# Récupération des noms des catégories
-for nom_categories in infos_categories.children :
-    if nom_categories.name :
-        noms_categorie.append(nom_categories.text.strip())
-
-# Récupération des liens des catégories
-for lien_categories in infos_categories.find_all("a") :
-    liens_categorie.append("https://books.toscrape.com/" + lien_categories.get("href"))
-'''
-
-
-for recup_lien in LienLivresCategorie().liste_livres(liens_categorie):
-    page = requests.get(recup_lien)
-    soupe = BeautifulSoup(page.content, "html.parser")
-    links = soupe.find_all("article")
-    for i in links:
-        livres_d_une_categorie = Livre(i.h3.a.get("href").replace("../../..", "http://books.toscrape.com/catalogue"))
-        livres.append(livres_d_une_categorie)
+    #Téléchargement de l'image dans le dossier "images"
+    #L'image est également renomé en fonction du nom du livre.
     
-print(livres)
+        nom_image = liste_donnees_livres[1]
+        chemin_image = os.path.join(dossier_images, nom_image)
+        f = open(chemin_image, "wb")
+
+        
+        response = requests.get(liste_donnees_livres[9])
+        f.write(response.content)
+        f.close()
+
+
+def recuperation_des_donnees(url):
+
+    # Créer le dossier "dossier livres" s'il n'existe pas déjà
+    dossier_livres = "dossier livres"
+    if not os.path.exists(dossier_livres):
+        os.mkdir(dossier_livres)
+
+    # Créer le dossier "images" à l'intérieur du dossier "dossier livres" s'il n'existe pas déjà
+    dossier_images = os.path.join(dossier_livres, "images")
+    if not os.path.exists(dossier_images):
+        os.mkdir(dossier_images)
+
+    page = requests.get(url)
+    soup = BeautifulSoup(page.content, "html.parser")
+    pages = soup.find("div", class_="side_categories")
+    infos_categories = pages.find("ul").find("li").find("ul")
+
+    # Récupération des noms des catégories
+    noms_categorie = []
+    for nom_categories in infos_categories.children :
+        if nom_categories.name :
+            noms_categorie.append(nom_categories.text.strip())
+
+    # Récupération des liens des catégories
+    liens_categorie = []
+    for lien_categories in infos_categories.find_all("a") :
+        liens_categorie.append("https://books.toscrape.com/" + lien_categories.get("href"))
+
+    for nom_categorie,lien_categorie in zip(noms_categorie, liens_categorie):
+        donnees_des_livres = Categorie(nom_categorie).liste_de_livres(lien_categorie)
+        ecriture_donnees_livres(nom_categorie, dossier_livres, dossier_images, donnees_des_livres)
+
+
+
+
+
+
+
+
+recuperation_des_donnees(url_book_to_scrap)
+
+
 
 
 
