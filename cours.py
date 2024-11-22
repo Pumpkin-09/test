@@ -34,12 +34,12 @@ class Livre:
 
 
 class Categorie:
-    def __init__(self, nom):
+    def __init__(self, nom, livres=[]):
         self.nom = nom
+        self.livres = livres
 
     def liste_de_livres(self, url_de_categorie):
 
-        livres = []
         page = requests.get(url_de_categorie)
         soupe = BeautifulSoup(page.content, "html.parser")
         page_suivante = soupe.find("li", class_="next")
@@ -54,7 +54,7 @@ class Categorie:
             for lien_livre in liens_livre:
                 lien_livre_modifier = lien_livre.h3.a.get("href").replace("../../..", "http://books.toscrape.com/catalogue")
                 livre = Scrapeur("truc").donnees_livre(lien_livre_modifier)
-                livres.append(livre)
+                self.livres.append(livre)
 
             page_modifier = requests.get(url_modifier)
             soupe = BeautifulSoup(page_modifier.content, "html.parser")
@@ -66,9 +66,8 @@ class Categorie:
         for lien_livre in liens_livre:
             lien_livre_modifier = lien_livre.h3.a.get("href").replace("../../..", "http://books.toscrape.com/catalogue")
             livre = Scrapeur("livre").donnees_livre(lien_livre_modifier)
-            livres.append(livre)
+            self.livres.append(livre)
 
-        return livres
 
 
 
@@ -211,12 +210,9 @@ def recuperation_des_donnees(url):
         liens_categorie.append("https://books.toscrape.com/" + lien_categories.get("href"))
 
     for nom_categorie,lien_categorie in zip(noms_categorie, liens_categorie):
-        donnees_des_livres = Categorie(nom_categorie).liste_de_livres(lien_categorie)
-        ecriture_donnees_livres(nom_categorie, dossier_livres, dossier_images, donnees_des_livres)
-
-
-
-
+        categorie = Categorie(nom_categorie)
+        categorie.liste_de_livres(lien_categorie)
+        ecriture_donnees_livres(nom_categorie, dossier_livres, dossier_images, categorie.livres)
 
 
 
